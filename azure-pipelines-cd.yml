@@ -1,0 +1,71 @@
+# ========================================================
+# PIPELINE NAME
+# ========================================================
+name: $(Date:yyyyMMdd)$(Rev:.r)-CD
+
+# ========================================================
+# DISABLE COMMIT TRIGGERS
+# We do not want this to run on git pushes, only on CI completion.
+# ========================================================
+trigger: none
+
+# ========================================================
+# PIPELINE RESOURCE TRIGGER
+# This is how we connect CI to CD.
+# ========================================================
+resources:
+  pipelines:
+    - pipeline: ci-pipeline-resource  # Local alias for this resource
+      source: 'azure-pipelines-ci'    # EXACT name of your CI pipeline defined in Azure DevOps
+      trigger: 
+        branches:
+          include:
+            - main
+
+pool:
+  vmImage: 'ubuntu-latest'
+
+stages:
+  # --- STAGE 1: DEPLOY TO STAGING ---
+  - stage: DeployStaging
+    displayName: 'Deploy to Staging'
+    jobs:
+      # We use a 'deployment' job instead of a standard 'job' 
+      # to utilize Environment features (like history and gates).
+      - deployment: DeployStagingJob
+        displayName: 'Staging Deployment'
+        environment: 'StagingEnvironment' # Ensure this Environment exists in ADO
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+                # Automatically downloads artifacts from the triggered CI pipeline
+                - download: ci-pipeline-resource
+                  artifact: 'drop'
+                
+                - script: |
+                    echo "Deploying to Staging..."
+                    echo "Artifact location: $(Pipeline.Workspace)/ci-pipeline-resource/drop"
+                    ls -R $(Pipeline.Workspace)/ci-pipeline-resource/drop
+                  displayName: 'Run Staging Script'
+
+  # --- STAGE 2: DEPLOY TO PRODUCTION ---
+  - stage: DeployProd
+    displayName: 'Deploy to Production'
+    # KEY CONSTRAINT:
+    # This prevents parallel deployment. Prod waits for Staging to finish.
+    dependsOn: DeployStaging
+    condition: succeeded()
+    jobs:
+      - deployment: DeployProdJob
+        displayName: 'Production Deployment'
+        environment: 'ProductionEnvironment'
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+                - download: ci-pipeline-resource
+                  artifact: 'drop'
+
+                - script: echo "Deploying to Production (Live)..."
+                  displayName: 'Run Production Script'
