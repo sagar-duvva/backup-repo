@@ -1,0 +1,63 @@
+# ============================================================
+# TRIGGER CONFIGURATION (NO PARALLELISM)
+# ============================================================
+
+trigger:
+  batch: true   # Prevents parallel CI runs on the same branch
+  branches:
+    include:
+      - Feature
+
+# ============================================================
+# AGENT POOL
+# ============================================================
+pool:
+  name: Default
+  #vmImage: ubuntu-latest
+
+# ============================================================
+
+# steps:
+# - script: echo Hello, world!
+#   displayName: 'one-line'
+
+# - script: |
+#     echo Add other tasks to build, test, and deploy your project.
+#     echo See https://aka.ms/yaml
+#   displayName: 'multi-line'
+#   condition: succeeded()
+
+# ============================================================
+
+stages:
+  # ----- STAGE 1 BUILD -----
+  - stage: BuildStage
+    displayName: 'Build Stage'
+    jobs:
+      - job: BuildJob
+        displayName: 'Build Job'
+        steps:
+          # Step 1: Echo Build Script
+          - script: |
+              echo "Hello World from Build Job"
+            displayName: 'Step 1: Echo Build Script'
+
+  # ----- STAGE 2 Test -----
+  - stage: TestStage
+    displayName: 'Test Stage'
+    dependsOn: BuildStage
+    condition: succeeded()
+    jobs:
+      - job: TestJob
+        displayName: 'Test Job'
+        steps:
+          # Step 1: Echo Test Script
+          - script: |
+              echo "Hello World from Test Job"
+            displayName: 'Step 1: Echo Test Script'
+
+          # Step 2: Echo Test Multi Line Script
+          - script: |
+              echo Add other tasks to build, test, and deploy your project.
+              echo See https://aka.ms/yaml
+            displayName: 'Step 2: Echo Test Multi Line Script'
