@@ -1,0 +1,49 @@
+# ============================================================
+# CI Pipeline
+# Purpose: Build, test, and validate code changes on every push
+# Ensures sequential execution of jobs (no parallelism)
+# ============================================================
+
+trigger:
+  branches:
+    include:
+      - main   # CI runs only when changes are pushed to 'main'
+
+pool:
+  vmImage: 'ubuntu-latest'   # Use Microsoft-hosted Ubuntu agent
+
+jobs:
+- job: Build
+  displayName: "Build Job"
+  steps:
+    # Step 1: Setup Node.js environment
+    - task: NodeTool@0
+      inputs:
+        versionSpec: '18.x'
+      displayName: "Use Node.js 18"
+
+    # Step 2: Install dependencies and build project
+    - script: |
+        npm install
+        npm run build
+      displayName: "Install dependencies and build"
+
+- job: Test
+  displayName: "Test Job"
+  dependsOn: Build   # Sequential execution: Test runs only after Build
+  condition: succeeded()   # Run only if Build succeeds
+  steps:
+    # Step 3: Run unit tests
+    - script: |
+        npm test
+      displayName: "Run unit tests"
+
+- job: Lint
+  displayName: "Lint Job"
+  dependsOn: Test   # Sequential execution: Lint runs only after Test
+  condition: succeeded()
+  steps:
+    # Step 4: Run lint checks
+    - script: |
+        npm run lint
+      displayName: "Run lint checks"
