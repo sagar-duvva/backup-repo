@@ -1,0 +1,80 @@
+# ========================================================
+# PIPELINE NAME
+# Automatically names the run based on date and revision
+# ========================================================
+name: $(Date:yyyyMMdd)$(Rev:.r)-CI
+
+# ========================================================
+# TRIGGER CONFIGURATION (NO PARALLELISM)
+# ========================================================
+trigger:
+  # 'batch: true' is the key to preventing parallelism. 
+  # If 5 commits arrive while a build is running, it won't 
+  # spawn 5 new builds. It will wait for the current one to finish, 
+  # then run ONCE for the very latest commit.
+  batch: true
+  branches:
+    include:
+      - main
+
+# ========================================================
+# AGENT POOL
+# ========================================================
+pool:
+  vmImage: 'ubuntu-latest'
+
+# ========================================================
+# VARIABLES
+# ========================================================
+variables:
+  buildConfiguration: 'Release'
+  outputDirectory: '$(System.DefaultWorkingDirectory)/drop'
+
+# ========================================================
+# STAGES
+# ========================================================
+stages:
+  # --- STAGE 1: BUILD ---
+  - stage: BuildStage
+    displayName: 'Build Stage'
+    jobs:
+      - job: BuildJob
+        displayName: 'Compile and Publish'
+        steps:
+          # Step 1: Echo script (simulating dependency restore)
+          - script: echo "Restoring NuGet/NPM packages..."
+            displayName: 'Restore Dependencies'
+
+          # Step 2: Echo script (simulating build)
+          - script: echo "Building project in $(buildConfiguration) mode..."
+            displayName: 'Build Project'
+
+          # Step 3: Copy Files (Prepping for artifact publish)
+          - task: CopyFiles@2
+            displayName: 'Copy Files to Staging'
+            inputs:
+              SourceFolder: '$(System.DefaultWorkingDirectory)'
+              Contents: '**/*.txt' # Example: copying text files
+              TargetFolder: '$(outputDirectory)'
+
+          # Step 4: Publish Artifacts (Handing off to CD pipeline)
+          - task: PublishPipelineArtifact@1
+            displayName: 'Publish Artifacts'
+            inputs:
+              targetPath: '$(outputDirectory)'
+              artifact: 'drop'
+              publishLocation: 'pipeline'
+
+  # --- STAGE 2: TEST ---
+  - stage: TestStage
+    displayName: 'Test Stage'
+    # 'dependsOn' ensures this stage creates a dependency chain.
+    # It cannot start until 'BuildStage' succeeds.
+    dependsOn: BuildStage
+    condition: succeeded()
+    jobs:
+      - job: TestJob
+        displayName: 'Run Unit Tests'
+        steps:
+          - script: echo "Running automated unit tests..."
+            displayName: 'Execute Tests'
