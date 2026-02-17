@@ -1,0 +1,42 @@
+# ============================================================
+# CD Pipeline
+# Purpose: Deploy application sequentially to staging, run tests,
+# then deploy to production if all prior steps succeed
+# ============================================================
+
+trigger: none   # CD pipeline triggered manually or via release pipeline
+
+pool:
+  vmImage: 'ubuntu-latest'
+
+jobs:
+- job: Deploy_Staging
+  displayName: "Deploy to Staging"
+  steps:
+    # Step 1: Deploy to staging environment
+    - script: |
+        echo "Deploying to staging environment..."
+        ./scripts/deploy.sh staging
+      displayName: "Staging Deployment"
+
+- job: Integration_Tests
+  displayName: "Integration Tests"
+  dependsOn: Deploy_Staging   # Sequential execution: runs after staging deployment
+  condition: succeeded()
+  steps:
+    # Step 2: Run integration tests against staging
+    - script: |
+        echo "Running integration tests..."
+        ./scripts/run-integration-tests.sh
+      displayName: "Run integration tests"
+
+- job: Deploy_Production
+  displayName: "Deploy to Production"
+  dependsOn: Integration_Tests   # Sequential execution: runs after tests
+  condition: succeeded()
+  steps:
+    # Step 3: Deploy to production environment
+    - script: |
+        echo "Deploying to production environment..."
+        ./scripts/deploy.sh production
+      displayName: "Production Deployment"
